@@ -6,6 +6,11 @@ find_package(OpenCV)
 find_package(OpenGL)
 find_package(GLUT)
 
+if(APPLE)
+  include_directories(/opt/local/include)
+  link_directories(/opt/local/lib)
+endif(APPLE)
+
 #set(CUDA_NVCC_FLAGS -arch=sm_20)
 cuda_add_library(gpu-module gpu-module.cu)
 
