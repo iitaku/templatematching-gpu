@@ -5,7 +5,7 @@
 #include <iomanip>
 #include <sstream>
 
-#include <opencv/highgui.h>
+#include <opencv2/opencv.hpp>
 #include <cuda.h>
 
 #include <GL/glew.h>
@@ -59,18 +59,18 @@ class Display
     }
 
   public:
-    Display(int& argc, char* argv[], int width, int height)
+    Display(int& argc, char* argv[], int image_width, int image_height)
     {
       glutInit(&argc, argv);
       glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
 
-      glutInitWindowSize(width, height);
+      glutInitWindowSize(image_width, image_height);
 
       glutCreateWindow("Real Template Matching");
       glutDisplayFunc(display_callback);
       glutKeyboardFunc(keyboard_callback);
 
-      F::init(width, height);
+      F::init(image_width, image_height);
 
       GL_CHECK_ERROR();
     }
@@ -84,22 +84,24 @@ class Display
     {
       F::finish();
     }
-
 };
 
 struct CaptureAndDrawImage
 {
   
-  static int width_;
-  static int height_;
+  static int image_width_;
+  static int image_height_;
   static int counter_;
   static GLuint gl_pbo_;
   static GLuint gl_tex_;
+  static Pixel *image_data_;
+  static CvCapture *capture_;
 
-  static void init(int width, int height)
+  static void init(int image_width, int image_height)
   {
-    width_ = width;
-    height_ = height;
+    image_width_ = image_width;
+    image_height_ = image_height;
+    image_data_ = new Pixel[image_width_*image_height_];
     
     /* initialize extensions */
     assert(GLEW_OK == glewInit());
@@ -111,7 +113,7 @@ struct CaptureAndDrawImage
 
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gl_pbo_);
   
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLubyte), 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, image_width_ * image_height_ * sizeof(Pixel), 0, GL_DYNAMIC_DRAW);
 
     GL_CHECK_ERROR();
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
@@ -119,28 +121,51 @@ struct CaptureAndDrawImage
     /* texture */
     glGenTextures(1, &gl_tex_);
     glBindTexture(GL_TEXTURE_2D, gl_tex_);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_,  0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, image_width_, image_height_,  0, GL_LUMINANCE, GL_UNSIGNED_BYTE, NULL);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     GL_CHECK_ERROR();
-
-    gpu_module_init(gl_pbo_);
+    
+    IplImage *template_image = cvLoadImage("template_image.png", CV_LOAD_IMAGE_GRAY);
+    
+    /* initialize CUDA */
+    gpu_module_init(gl_pbo_, );
   }
 
   static void finish(void)
   {
+      delete[] image_data_;
+      cvReleaseCapture(&capture_);
   }
 
   static void compute(void)
   {
-    std::vector<Pixel> data(width_*height_);
-    for(int i=0; i<width_*height_; ++i)
+    if (NULL == capture_)
     {
-      data[i].r = rand();
+        /* initialize OpenCV */
+        capture_ = cvCreateCameraCapture(0);
+        assert(NULL != capture_);
+
+        cvSetCaptureProperty(capture_, CV_CAP_PROP_FRAME_WIDTH, image_width_);
+        cvSetCaptureProperty(capture_, CV_CAP_PROP_FRAME_HEIGHT, image_height_);
+
+        IplImage* image = cvQueryFrame( capture_ );
+        assert(3 == image->nChannels);
+        assert(8 == image->depth);
     }
-    gpu_module_compute(&data[0], width_, height_, counter_);
+    
+    IplImage* image = cvQueryFrame( capture_ );
+
+    for(int i=0; i<image->image_height; ++i)
+    {
+        for(int j=0; j<image->image_width; ++j)
+        {
+            image_data_[i*image_width_+j] = image->imageData[i*image->image_widthStep+3*j+0];
+        }
+    }
+
+    gpu_module_compute(image_data_, image_width_, image_height_, counter_);
     counter_++;
   }
 
@@ -150,7 +175,7 @@ struct CaptureAndDrawImage
 
     glBindTexture(GL_TEXTURE_2D, gl_tex_);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gl_pbo_);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width_, height_, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image_width_, image_height_, GL_LUMINANCE, GL_UNSIGNED_BYTE, NULL);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     glDisable(GL_DEPTH_TEST);
@@ -188,10 +213,12 @@ struct CaptureAndDrawImage
   }
 };
 
-int CaptureAndDrawImage::width_ = 0;
-int CaptureAndDrawImage::height_ = 0;
+int CaptureAndDrawImage::image_width_ = 0;
+int CaptureAndDrawImage::image_height_ = 0;
 int CaptureAndDrawImage::counter_ = 0;
 GLuint CaptureAndDrawImage::gl_pbo_ = 0;
 GLuint CaptureAndDrawImage::gl_tex_ = 0;
+Pixel *CaptureAndDrawImage::image_data_ = NULL;
+CvCapture *CaptureAndDrawImage::capture_ = NULL;
 
 #endif /* DISPLAY_H */

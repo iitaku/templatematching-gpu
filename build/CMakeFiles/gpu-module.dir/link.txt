@@ -1,0 +1,2 @@
+/usr/bin/ar cr libgpu-module.a  ./gpu-module_generated_gpu-module.cu.o
+/usr/bin/ranlib libgpu-module.a

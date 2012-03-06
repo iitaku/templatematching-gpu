@@ -1,18 +1,13 @@
 #ifndef TYPE_H
 #define TYPE_H
 
-#ifdef __APPLE__
-#include <GLUT/glut.h>
-#else
-#include <GL/glut.h>
-#endif
-
+//typedef unsigned char Pixel;
 struct Pixel
 {
-  GLbyte r;
-  GLbyte g;
-  GLbyte b;
-  GLbyte a;
-};
+    unsigned char r;
+    unsigned char g;
+    unsigned char b;
+    unsigned char a;
+}
 
 #endif /* TYPE_H */
