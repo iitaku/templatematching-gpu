@@ -1,1 +1,0 @@
-/usr/bin/c++    -Wl,-search_paths_first -Wl,-headerpad_max_install_names   CMakeFiles/templatematching.dir/main.cc.o  -o templatematching  -L/opt/local/lib libgpu-module.a -lopencv_highgui -lGLEW -framework AGL -framework OpenGL -framework GLUT -framework Cocoa /usr/local/cuda/lib/libcudart.dylib -Wl,-rpath -Wl,/usr/local/cuda/lib /usr/local/cuda/lib/libcuda.dylib 

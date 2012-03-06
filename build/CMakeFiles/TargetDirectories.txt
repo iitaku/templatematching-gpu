@@ -1,2 +1,0 @@
-/Users/iitaku/Developer/templatematching-gpu/build/CMakeFiles/gpu-module.dir
-/Users/iitaku/Developer/templatematching-gpu/build/CMakeFiles/templatematching.dir
